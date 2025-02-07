@@ -246,10 +246,13 @@ function resetGame() {
     gameStarted = false;
 }
 
-// Game loop with delta time
+//game loop
 let lastTime = 0;
+const targetFrameTime = 1000 / 60; // Lock to 60 FPS
+
+
 function gameLoop(timestamp) {
-    const deltaTime = timestamp - lastTime;
+    let deltaTime = (timestamp - lastTime) / targetFrameTime; // Normalize deltaTime to 1 at 60 FPS
     lastTime = timestamp;
 
     ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -259,14 +262,16 @@ function gameLoop(timestamp) {
     drawBird();
     drawIcon();
     drawMenuLogo();
-    updateBird();
-    updatePipes();
-    updateGround();
-    updateBackground();
+    
+    updateBird(deltaTime);
+    updatePipes(deltaTime);
+    updateGround(deltaTime);
+    updateBackground(deltaTime);
     detectCollisions();
 
     requestAnimationFrame(gameLoop);
 }
+
 
 // Jump control for both keyboard and touch events
 function jump() {
