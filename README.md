@@ -9,3 +9,8 @@ https://gooberheads6297.github.io/Floppy-Bird/
 
 
 This is a simple remake of the game, "Flappy Bird" That allows the player to play as a bird that flies its way through green pipes without getting hit or it loses. 
+
+
+![thumbnailfloppybird2](https://github.com/user-attachments/assets/fe188962-6d27-4f66-8f76-675fa4e6b075)
+
+*These pictures aren't in-game footage*
