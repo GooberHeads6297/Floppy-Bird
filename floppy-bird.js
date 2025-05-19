@@ -1,12 +1,16 @@
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
+const backgroundMusic = document.getElementById('backgroundMusic');
+const soundToggleButton = document.getElementById('soundToggleButton');
+const crashSound = document.getElementById('crashSound');
+
 function resizeCanvas() {
   canvas.width = window.innerWidth;
   canvas.height = window.innerHeight;
 }
 resizeCanvas();
 window.addEventListener('resize', resizeCanvas);
-resizeCanvas();
+
 const birdImgs = [new Image(), new Image(), new Image()];
 birdImgs[0].src = 'images/bird1.png';
 birdImgs[1].src = 'images/bird2.png';
@@ -33,9 +37,10 @@ const restartPressedImg = new Image();
 restartPressedImg.src = 'images/restartPressed.png';
 const featherImg = new Image();
 featherImg.src = 'images/feather.png';
+
 const mainTotalImages = 10;
 const scoreTotalImages = 10;
-const totalImages = mainTotalImages + scoreTotalImages + 4;
+const totalImages = mainTotalImages + scoreTotalImages + 4; 
 let imagesLoaded = 0;
 function checkAllImagesLoaded() {
   imagesLoaded++;
@@ -55,6 +60,7 @@ gameOverBorderImg.onload = checkAllImagesLoaded;
 restartUnpressedImg.onload = checkAllImagesLoaded;
 restartPressedImg.onload = checkAllImagesLoaded;
 featherImg.onload = checkAllImagesLoaded;
+
 const numberNames = ["zero","one","two","three","four","five","six","seven","eight","nine"];
 const numberImages = {};
 numberNames.forEach((name,index) => {
@@ -103,6 +109,8 @@ let gameOverMenuActive = false;
 let restartButtonPressed = false;
 let gameOverTime = 0;
 let feathers = [];
+
+let isMuted = false;
 function getGameOverUIPositions() {
   let borderScale = Math.min((canvas.width * 0.8) / gameOverBorderImg.width, (canvas.height * 0.8) / gameOverBorderImg.height);
   let borderWidth = gameOverBorderImg.width * borderScale;
@@ -203,19 +211,14 @@ function updateBird(deltaTime) {
       bird.velocity = 0;
     }
   } else if (gameStarted && gameOverMenuActive && !bird.resting) {
-    if (Date.now() - gameOverTime > 3000) {
-      bird.resting = true;
-      bird.vx = 0;
-      bird.vy = 0;
-    } else {
-      if (typeof bird.vx === 'undefined') {
+    if (typeof bird.vx === 'undefined') {
         bird.vx = (Math.random() - 0.5) * 10;
         bird.vy = bird.velocity;
       }
       bird.vy += bird.gravity * deltaTime;
       bird.vx += (Math.random() - 0.5) * 0.5;
       bird.vy += (Math.random() - 0.5) * 0.5;
-      const damping = 0.98;
+      const damping = 0.99; // Reduced damping for longer flopping
       bird.vx *= damping;
       bird.vy *= damping;
       bird.x += bird.vx * deltaTime;
@@ -234,12 +237,13 @@ function updateBird(deltaTime) {
       }
       if (bird.y + bird.height > ground.y) {
         bird.y = ground.y - bird.height;
-        if (Math.abs(bird.vy) < 1) {
+        if (Math.abs(bird.vy) < 0.5 && bird.y + bird.height >= ground.y -1) {
           bird.vy = 0;
           bird.vx = 0;
           bird.resting = true;
         } else {
-          bird.vy = -bird.vy * 0.7;
+          bird.vy = -bird.vy * 0.9; 
+          bird.vx += (Math.random() - 0.5) * 3; 
         }
       }
       pipes.forEach(pipe => {
@@ -252,10 +256,10 @@ function updateBird(deltaTime) {
           resolveCollision(bird, bottomPipe);
         }
       });
-    }
   }
 }
 function resolveCollision(b, r) {
+  const collisionRestitution = 0.75; 
   let overlapX = 0;
   let overlapY = 0;
   if (b.x + b.width / 2 < r.x + r.width / 2) {
@@ -270,10 +274,10 @@ function resolveCollision(b, r) {
   }
   if (Math.abs(overlapX) < Math.abs(overlapY)) {
     b.x -= overlapX;
-    b.vx = -b.vx;
+    b.vx = -b.vx * collisionRestitution;
   } else {
     b.y -= overlapY;
-    b.vy = -b.vy;
+    b.vy = -b.vy * collisionRestitution;
   }
 }
 function updatePipes(deltaTime) {
@@ -368,6 +372,10 @@ function detectCollisions() {
         if (!gameOverTime) {
           gameOverTime = Date.now();
           createFeathers();
+          if (crashSound) { //
+            crashSound.currentTime = 0; 
+            crashSound.play().catch(error => console.error("Error playing crash sound:", error));
+          }
         }
         break;
       }
@@ -377,6 +385,10 @@ function detectCollisions() {
       if (!gameOverTime) {
         gameOverTime = Date.now();
         createFeathers();
+        if (crashSound) { //
+          crashSound.currentTime = 0; 
+          crashSound.play().catch(error => console.error("Error playing crash sound:", error));
+        }
       }
     }
   }
@@ -394,8 +406,25 @@ function resetGame() {
   previousPipeHeight = canvas.height / 2;
   gameStarted = false;
   score = 0;
+  if (backgroundMusic) {
+    backgroundMusic.currentTime = 0; 
+  }
   gameOverTime = 0;
 }
+
+function toggleMute() {
+  isMuted = !isMuted;
+  if (backgroundMusic) {
+    backgroundMusic.muted = isMuted;
+    if (soundToggleButton) {
+      soundToggleButton.textContent = isMuted ? '🔇' : '🔊';
+    }
+    if (!isMuted && gameStarted && !gameOverMenuActive && backgroundMusic.paused) {
+      backgroundMusic.play().catch(e => console.error("Error playing music on unmute:", e));
+    }
+  }
+}
+
 function showGameOverMenu() {
   let pos = getGameOverUIPositions();
   ctx.drawImage(gameOverBorderImg, pos.borderX, pos.borderY, pos.borderWidth, pos.borderHeight);
@@ -432,6 +461,20 @@ function gameLoop(timestamp) {
     updateBird(deltaTime);
     showGameOverMenu();
   }
+
+  if (backgroundMusic) {
+    backgroundMusic.muted = isMuted; 
+
+    if (gameStarted && !gameOverMenuActive) { 
+        if (backgroundMusic.paused && !isMuted) { 
+            backgroundMusic.play().catch(error => console.error("Error playing music:", error));
+        }
+    } else { 
+        if (!backgroundMusic.paused) {
+            backgroundMusic.pause();
+        }
+    }
+  }
   requestAnimationFrame(gameLoop);
 }
 document.addEventListener('keydown', (e) => {
@@ -463,6 +506,7 @@ canvas.addEventListener('click', (e) => {
 canvas.addEventListener('touchstart', (e) => {
   e.preventDefault();
   if (gameOverMenuActive) {
+    // Sound button is now an HTML element, its touch is handled separately.
     let touch = e.touches[0];
     let rect = canvas.getBoundingClientRect();
     let x = touch.clientX - rect.left;
@@ -477,9 +521,18 @@ canvas.addEventListener('touchstart', (e) => {
       }, 200);
     }
   } else if (canJump) {
-    jump();
+    jump(); 
   }
 });
+
+if (soundToggleButton) {
+  soundToggleButton.addEventListener('click', toggleMute);
+  soundToggleButton.addEventListener('touchstart', (e) => {
+    e.preventDefault(); // Prevent click event from firing as well on touch devices
+    toggleMute();
+  });
+}
+
 function jump() {
   if (!gameStarted) {
     gameStarted = true;
@@ -490,5 +543,4 @@ function jump() {
   canJump = false;
   setTimeout(() => canJump = true, jumpCooldown);
 }
-requestAnimationFrame(gameLoop);
 requestAnimationFrame(gameLoop);
